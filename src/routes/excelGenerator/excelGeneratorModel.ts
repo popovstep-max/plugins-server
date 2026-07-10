@@ -86,6 +86,13 @@ export const ExcelGeneratorRequestBodySchema = z
         autoFitColumnWidth: z.boolean().optional(),
         autoFilter: z.boolean().optional(),
         wrapText: z.boolean().optional(),
+        titleFillColor: z.string().optional().openapi({ description: 'Hex fill color for the table title row, e.g. 1F4E78.' }),
+        titleFontColor: z.string().optional().openapi({ description: 'Hex font color for the table title row, e.g. FFFFFF.' }),
+        headerFillColor: z.string().optional().openapi({ description: 'Hex fill color for the column header row, e.g. 2E75B6.' }),
+        headerFontColor: z.string().optional().openapi({ description: 'Hex font color for the column header row, e.g. FFFFFF.' }),
+        zebra: z.boolean().optional().openapi({ description: 'Whether to alternate row shading for data rows.' }),
+        zebraColor: z.string().optional().openapi({ description: 'Hex fill color for alternating (zebra) data rows, e.g. F2F2F2.' }),
+        cellAlignment: z.enum(['left', 'center', 'right']).optional().openapi({ description: 'Horizontal alignment for data cells.' }),
       })
       .optional()
       .openapi({

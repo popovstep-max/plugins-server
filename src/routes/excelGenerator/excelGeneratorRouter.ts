@@ -92,6 +92,13 @@ interface ExcelConfig {
   autoFilter: boolean;
   borderStyle: ExcelJS.BorderStyle | null; // thin, double, dashed, thick
   wrapText: boolean;
+  titleFillColor: string; // hex, no '#'
+  titleFontColor: string;
+  headerFillColor: string;
+  headerFontColor: string;
+  zebra: boolean;
+  zebraColor: string;
+  cellAlignment: 'left' | 'center' | 'right';
 }
 
 const DEFAULT_EXCEL_CONFIGS: ExcelConfig = {
@@ -102,8 +109,20 @@ const DEFAULT_EXCEL_CONFIGS: ExcelConfig = {
   autoFitColumnWidth: true,
   autoFilter: false,
   wrapText: false,
-  borderStyle: null,
+  borderStyle: 'thin',
+  titleFillColor: '1F4E78',
+  titleFontColor: 'FFFFFF',
+  headerFillColor: '2E75B6',
+  headerFontColor: 'FFFFFF',
+  zebra: true,
+  zebraColor: 'F2F2F2',
+  cellAlignment: 'center',
 };
+
+function solidFill(hex: string): ExcelJS.Fill {
+  const clean = hex.replace('#', '').toUpperCase();
+  return { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${clean}` } };
+}
 
 // Helper function to convert column letter (e.g., 'A') to column index (e.g., 1)
 function columnLetterToNumber(letter: string): number {
@@ -165,7 +184,9 @@ export function execGenExcelFuncs(sheetsData: SheetData[], excelConfigs: ExcelCo
     name: excelConfigs.fontFamily,
     bold: true,
     size: excelConfigs.tableTitleFontSize,
+    color: { argb: `FF${excelConfigs.titleFontColor.replace('#', '').toUpperCase()}` },
   };
+  const titleFillConfigs = solidFill(excelConfigs.titleFillColor);
   const headerAligmentConfigs: any = {
     wrapText: excelConfigs.wrapText,
     horizontal: 'center',
@@ -175,14 +196,19 @@ export function execGenExcelFuncs(sheetsData: SheetData[], excelConfigs: ExcelCo
     name: excelConfigs.fontFamily,
     bold: true,
     size: excelConfigs.headerFontSize,
+    color: { argb: `FF${excelConfigs.headerFontColor.replace('#', '').toUpperCase()}` },
   };
+  const headerFillConfigs = solidFill(excelConfigs.headerFillColor);
   const cellAlignmentConfigs: any = {
     wrapText: excelConfigs.wrapText,
+    horizontal: excelConfigs.cellAlignment,
+    vertical: 'middle',
   };
   const cellFontConfigs: any = {
     name: excelConfigs.fontFamily,
     size: excelConfigs.fontSize,
   };
+  const zebraFillConfigs = solidFill(excelConfigs.zebraColor);
 
   sheetsData.forEach(({ sheetName, tables }) => {
     const worksheet = workbook.addWorksheet(sheetName);
@@ -199,6 +225,7 @@ export function execGenExcelFuncs(sheetsData: SheetData[], excelConfigs: ExcelCo
         startCell.alignment = titleAlignmentConfigs;
         startCell.font = titleFontConfigs;
         startCell.border = borderConfigs;
+        startCell.fill = titleFillConfigs;
         rowIndex++; // Move to the next row
       }
 
@@ -210,6 +237,7 @@ export function execGenExcelFuncs(sheetsData: SheetData[], excelConfigs: ExcelCo
           cell.alignment = headerAligmentConfigs;
           cell.font = headerFontConfigs;
           cell.border = borderConfigs;
+          cell.fill = headerFillConfigs;
         });
         rowIndex++; // Increment row index after adding headers
       }
@@ -237,7 +265,8 @@ export function execGenExcelFuncs(sheetsData: SheetData[], excelConfigs: ExcelCo
         }) || [];
 
       // Add rows with data types
-      rows.forEach((rowData) => {
+      rows.forEach((rowData, dataRowIdx) => {
+        const isZebraRow = excelConfigs.zebra && dataRowIdx % 2 === 1;
         rowData.forEach((cellData, colIdx) => {
           const { type = 'static_value', value } = cellData;
           const valueType = columnTypes[colIdx];
@@ -297,6 +326,9 @@ export function execGenExcelFuncs(sheetsData: SheetData[], excelConfigs: ExcelCo
           cell.font = cellFontConfigs;
           cell.border = borderConfigs;
           cell.alignment = cellAlignmentConfigs;
+          if (isZebraRow) {
+            cell.fill = zebraFillConfigs;
+          }
         });
         rowIndex++; // Move to the next row
       });
@@ -339,7 +371,7 @@ export const excelGeneratorRouter: Router = (() => {
   router.use('/downloads', express.static(exportsDir));
 
   router.post('/generate', async (_req: Request, res: Response) => {
-    const { sheetsData, excelConfigs } = _req.body; // TODO: extract excel config object from request body
+    const { sheetsData, excelConfigs = {} } = _req.body; // TODO: extract excel config object from request body
     if (!sheetsData.length) {
       const validateServiceResponse = new ServiceResponse(
         ResponseStatus.Failed,
@@ -358,11 +390,18 @@ export const excelGeneratorRouter: Router = (() => {
         fontSize: excelConfigs.fontSize ?? DEFAULT_EXCEL_CONFIGS.fontSize,
         autoFilter: excelConfigs.autoFilter ?? DEFAULT_EXCEL_CONFIGS.autoFilter,
         borderStyle:
-          excelConfigs.borderStyle || excelConfigs.borderStyle !== 'none'
-            ? excelConfigs.borderStyle
-            : DEFAULT_EXCEL_CONFIGS.borderStyle,
+          excelConfigs.borderStyle === 'none'
+            ? null
+            : excelConfigs.borderStyle || DEFAULT_EXCEL_CONFIGS.borderStyle,
         wrapText: excelConfigs.wrapText ?? DEFAULT_EXCEL_CONFIGS.wrapText,
         autoFitColumnWidth: excelConfigs.autoFitColumnWidth ?? DEFAULT_EXCEL_CONFIGS.autoFitColumnWidth,
+        titleFillColor: excelConfigs.titleFillColor || DEFAULT_EXCEL_CONFIGS.titleFillColor,
+        titleFontColor: excelConfigs.titleFontColor || DEFAULT_EXCEL_CONFIGS.titleFontColor,
+        headerFillColor: excelConfigs.headerFillColor || DEFAULT_EXCEL_CONFIGS.headerFillColor,
+        headerFontColor: excelConfigs.headerFontColor || DEFAULT_EXCEL_CONFIGS.headerFontColor,
+        zebra: excelConfigs.zebra ?? DEFAULT_EXCEL_CONFIGS.zebra,
+        zebraColor: excelConfigs.zebraColor || DEFAULT_EXCEL_CONFIGS.zebraColor,
+        cellAlignment: excelConfigs.cellAlignment || DEFAULT_EXCEL_CONFIGS.cellAlignment,
       });
 
       const serviceResponse = new ServiceResponse(
